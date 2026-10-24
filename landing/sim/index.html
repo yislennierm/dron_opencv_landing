@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Landing Lab · 3D simulator</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0b121b;color:#dae6f3}*{box-sizing:border-box}body{margin:0}header{padding:22px 28px;border-bottom:1px solid #283747;display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:22px;margin:0 0 6px}p{color:#93a8bd;font-size:13px;margin:0;line-height:1.6}main{display:grid;grid-template-columns:1fr 310px;height:calc(100vh - 100px);min-height:400px}.scene{position:relative;min-height:0}#world{width:100%;height:100%;position:absolute;touch-action:none}.hud{position:absolute;top:22px;left:24px;pointer-events:none}.badge{display:inline-block;padding:7px 12px;background:#142a36;border:1px solid #2a6673;color:#7de2cf;border-radius:20px;font-size:12px;font-weight:700}.hint{position:absolute;bottom:18px;left:24px;color:#90a4b9;font-size:12px}aside{overflow-y:auto;background:#101c29;padding:22px;border-left:1px solid #283747}button{background:#244054;color:#fff;border:1px solid #395a71;padding:11px 13px;border-radius:8px;font-weight:600;cursor:pointer}button.primary{background:#65d7bd;color:#0a2726;border:0}button:disabled{opacity:.4;cursor:default}fieldset{border:0;padding:0;margin:0}fieldset:disabled{opacity:.65}.buttons{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 24px}label{display:block;color:#bed0df;font-size:13px;margin:18px 0}input[type=range]{width:100%;accent-color:#65d7bd;margin-top:10px}input[type=checkbox]{accent-color:#65d7bd}output{float:right;font-variant-numeric:tabular-nums}#camera{width:100%;height:180px;background:#17291f;border-radius:8px;margin-top:10px}dl{display:grid;grid-template-columns:1fr auto;gap:10px;font-size:13px}dt{color:#93a8bd}dd{margin:0;font-variant-numeric:tabular-nums}#message{min-height:60px;color:#7de2cf;margin:16px 0}small{display:block;font-size:11px;color:#93a8bd;line-height:1.6}.section{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#8299b0;margin-top:25px}@media(max-width:760px){main{grid-template-columns:1fr;height:auto}.scene{height:470px;min-height:470px}header{padding:16px}aside{border-left:0;border-top:1px solid #283747}}
+.command-panel{position:absolute;right:20px;top:22px;width:270px;padding:16px;background:#101c29ed;border:1px solid #395466;border-radius:12px;pointer-events:none;box-shadow:0 8px 28px #0004}.command-title{font-size:13px;font-weight:700;margin-bottom:8px}.command-panel p,.command-panel small{font-size:11px}.command-source{font-size:11px;color:#8ab6e1;font-weight:700;margin-bottom:10px}.command-panel[data-source=VISION] .command-source{color:#7de2cf}.command-panel[data-source=GPS] .command-source{color:#edb56b}.direction-pad{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:50px 50px 50px;gap:5px;margin:12px 0}.direction{background:#162635;border:1px solid #2a3c4c;border-radius:6px;text-align:center;padding:5px;color:#70899f;font-size:12px}.direction small{display:block;font-size:10px;color:inherit}.direction.active{color:#b0f9e5;border-color:#65d7bd;background:#205648}.command-panel[data-source=GPS] .direction.active{color:#ffe0b2;border-color:#edb56b;background:#624b2d}.pad-center{grid-area:2/2;display:grid;place-items:center;color:#93a8bd;font-size:10px}.command-row{display:flex;justify-content:space-between;gap:8px;margin:8px 0;font-size:11px}.tracker-output{border-top:1px solid #304251;padding-top:10px;margin-top:10px;color:#93a8bd;font-size:11px;line-height:1.7}@media(max-width:760px){.command-panel{width:220px;right:10px;top:12px;padding:10px}.direction-pad{grid-template-rows:38px 38px 38px}.command-panel small{font-size:10px}}
+
+/* One viewport: camera and run controls stay visible; tabs share the remaining space. */
+html,body{height:100%;overflow:hidden}body{height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr)}
+header{padding:13px 22px;min-height:72px}h1{font-size:20px;margin-bottom:3px}header p{font-size:12px}
+main{height:auto;min-height:0;grid-template-columns:minmax(0,1fr) 340px;overflow:hidden}
+aside{min-height:0;overflow:hidden;padding:14px;display:flex;flex-direction:column;gap:12px}
+.buttons{margin:0;display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:7px;flex-shrink:0}.buttons button{padding:9px 6px;font-size:12px}
+.camera-heading{font-size:10px;letter-spacing:1px;color:#8299b0;display:flex;justify-content:space-between;gap:8px}.camera-heading span{letter-spacing:0;color:#93a8bd}
+#camera{display:block;width:100%;height:clamp(90px,21vh,175px);object-fit:contain;margin:0;flex-shrink:1;min-height:65px;background:#14211b}
+.panel-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:#0b1521;padding:4px;border-radius:8px;flex-shrink:0}
+.panel-tabs button{font-size:12px;padding:7px 2px;border:0;background:transparent;color:#93a8bd}.panel-tabs button[aria-selected=true]{background:#264354;color:#a9f2dc}
+.panel-content{flex:1;min-height:0}.panel-content section[hidden]{display:none}.panel-note{font-size:11px;margin:0 0 10px;color:#93a8bd}
+.panel-content label{font-size:12px;margin:0 0 13px;line-height:1.4}.panel-content input[type=range]{display:block;margin:5px 0 0;height:16px}
+.panel-content label:has(input[type=checkbox]){margin:12px 0}.panel-content dl{margin:2px 0;gap:12px;font-size:12px}.panel-content dd{overflow-wrap:anywhere;text-align:right}
+.panel-content small{font-size:11px;line-height:1.65}.panel-footer{flex-shrink:0;border-top:1px solid #283747;padding-top:10px}
+#message{min-height:0;margin:0;font-size:12px;line-height:1.4}#tracking{font-size:10px;margin:6px 0 0;line-height:1.4;overflow-wrap:anywhere}
+@media(max-height:760px){header{min-height:60px;padding:9px 18px}aside{gap:8px;padding:10px}#camera{height:clamp(70px,17vh,125px)}.panel-content label{margin-bottom:9px}.panel-note{margin-bottom:7px}.panel-footer{padding-top:7px}.panel-content dl{gap:9px}.panel-content small{line-height:1.45}.command-panel{padding:12px;width:255px;top:14px;right:14px}.direction-pad{grid-template-rows:36px 36px 36px;margin:8px 0}.direction{font-size:11px;padding:2px}.direction small{font-size:10px}.command-title{margin-bottom:5px}.command-source{margin-bottom:5px}.tracker-output{padding-top:6px;margin-top:6px;line-height:1.5}.command-row{margin:6px 0}#commandExplanation{font-size:10px;line-height:1.4}}
+@media(max-height:560px) and (min-width:761px){.panel-content label:has(input[type=checkbox]){margin:5px 0}.panel-content input[type=range]{height:12px;margin-top:3px}.panel-content label{font-size:11px;margin-bottom:4px}header p{display:none}header{min-height:47px}aside{gap:6px}#camera{height:50px;min-height:40px}.panel-content label{margin-bottom:4px}.panel-content small{font-size:10px;line-height:1.35}.panel-content dl{gap:7px}.panel-note{font-size:10px}.panel-footer{padding-top:5px}#message{font-size:11px}#tracking{margin-top:3px}.panel-tabs button{padding:5px 2px}.command-panel{top:8px;padding:9px}.command-panel>small,#commandExplanation{display:none}.tracker-output{font-size:10px}.hint{bottom:8px;font-size:10px}}
+@media(max-width:760px){header{padding:10px 12px;min-height:64px}header .badge{display:none}header p{font-size:10px}main{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,52%)}.scene{height:auto;min-height:0}aside{border-left:0;border-top:1px solid #283747;display:grid;grid-template-columns:38% minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;gap:7px 12px;padding:9px}.buttons{grid-column:1/3}.camera-heading{grid-column:1;font-size:9px;align-self:center}.camera-heading span{display:none}#camera{grid-column:1;grid-row:3;width:100%;height:100%;min-height:0;max-height:160px;align-self:start}.panel-tabs{grid-column:2;grid-row:2;padding:2px}.panel-tabs button{font-size:11px;padding:5px 0}.panel-content{grid-column:2;grid-row:3}.panel-footer{grid-column:1/3}.panel-note{font-size:10px;margin-bottom:5px}.panel-content label{font-size:11px;margin-bottom:6px}.panel-content input[type=range]{margin-top:2px;height:13px}.panel-content dl{font-size:10px;gap:6px}.panel-content small{font-size:9px;line-height:1.35}.command-panel{width:205px;right:8px;top:8px;padding:8px}.command-panel>small,.tracker-output,#commandExplanation,.command-row:has(#worldCommand){display:none}.command-title{font-size:11px}.command-source{font-size:10px}.direction-pad{grid-template-rows:28px 28px 28px;gap:3px;margin:6px 0}.direction{font-size:9px;padding:1px}.direction small{font-size:9px;line-height:1.2}.command-row{font-size:9px;margin:4px 0}.hint{bottom:6px;left:10px;font-size:9px}.hud{top:8px;left:8px}.hud .badge{font-size:10px;padding:5px 8px}}
+.command-panel{pointer-events:auto}.direction{touch-action:none;user-select:none;cursor:pointer;font-weight:500}.direction:disabled{opacity:.65}.direction.held{outline:2px solid #89bdff;background:#244768;color:#d6eaff}.pad-center{border:0;background:#162635;padding:0;font-size:10px}.altitude-controls{display:flex;gap:6px;margin:8px 0}.altitude-controls button{flex:1;padding:6px 3px;font-size:11px;touch-action:none;user-select:none}.altitude-controls button.held{background:#244768;outline:2px solid #89bdff}.buttons{grid-template-columns:1.1fr 1.3fr .8fr .8fr;gap:5px}.buttons button{font-size:11px;padding-left:2px;padding-right:2px}#returnHome{border-color:#7e663b;color:#f4cd92}.flight-note{display:flex;justify-content:space-between;gap:5px;align-items:center}.demo-button{padding:0;background:none;border:0;font-size:10px;color:#9ecbe5;text-decoration:underline}.command-row #verticalSource{white-space:nowrap}@media(max-height:560px){.altitude-controls{margin:5px 0}.altitude-controls button{padding:4px 2px;font-size:10px}.command-title{font-size:11px}}@media(max-width:760px){.altitude-controls{margin:4px 0}.altitude-controls button{padding:3px 0;font-size:9px}.buttons button{font-size:10px}.hint{max-width:calc(100% - 12px);line-height:1.3}.flight-note span{font-size:9px}.demo-button{font-size:9px}}
+.camera-heading{align-items:center;letter-spacing:0;gap:6px;flex-shrink:0}.camera-heading label{font-size:10px;margin:0;color:#8299b0;flex-shrink:0}.camera-heading select{min-width:0;flex:1;font:11px system-ui;color:#c4d9e7;background:#162a38;border:1px solid #365062;border-radius:5px;padding:4px 2px}.camera-heading button{padding:2px 7px;font-size:16px;line-height:1.2;flex-shrink:0}#visionDialog{max-width:96vw;width:min(1320px,96vw);padding:14px;border:1px solid #486477;border-radius:12px;background:#101c29;color:#dae6f3;max-height:96dvh;overflow:hidden}#visionDialog::backdrop{background:#030a12cc}.vision-dialog-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:12px}.vision-dialog-toolbar strong{font-size:14px;margin-right:auto}.vision-dialog-toolbar select{max-width:40%;min-width:0;background:#162a38;color:#dae6f3;border:1px solid #365062;border-radius:5px;padding:7px;font-size:12px}.vision-dialog-toolbar button{font-size:12px;padding:7px 12px}#visionLarge{display:block;max-width:100%;width:100%;height:min(73dvh,720px);object-fit:contain;background:#090f16}#visionCaption{font-size:12px;margin-top:10px;line-height:1.5}@media(max-height:560px){.camera-heading select{padding:2px;font-size:10px}.camera-heading button{font-size:13px}.vision-dialog-toolbar{margin-bottom:6px}#visionLarge{height:68dvh}#visionCaption{font-size:10px;margin-top:5px}}@media(max-width:760px){.camera-heading{flex-wrap:nowrap}.camera-heading label{display:none}.camera-heading select{font-size:9px;padding:3px 0;width:90px}.camera-heading button{padding:2px 4px;font-size:13px}.vision-dialog-toolbar{gap:5px;flex-wrap:wrap}.vision-dialog-toolbar strong{font-size:12px}.vision-dialog-toolbar button{padding:5px 6px;font-size:11px}.vision-dialog-toolbar select{font-size:10px;max-width:50%}#visionCaption{font-size:10px}#visionLarge{height:65dvh}}
+</style>
+</head>
+<body>
+<header><div><h1>Landing Lab <span style="color:#65d7bd">/ 3D</span></h1><p>Real OpenCV tracking drives a simulated final approach. <span id="groundSize"></span></p></div><span class="badge">OPENCV IN THE LOOP</span></header>
+<main><section class="scene"><canvas id="world" aria-label="Interactive 3D quadcopter scene"></canvas><div class="hud"><span class="badge" id="phase">READY</span></div><div class="command-panel" id="commandPanel" data-source="IDLE">
+<div class="command-title">Flight controls / requested movement</div>
+<div class="command-source" id="commandSource">IDLE</div>
+<small>Hold arrows to fly · release to brake</small>
+<div class="direction-pad" aria-label="Requested camera-plane movement">
+<button type="button" class="direction" id="cmdUp" style="grid-area:1/2">↑ UP<small id="upSpeed">0.00 m/s</small></button>
+<button type="button" class="direction" id="cmdLeft" style="grid-area:2/1">← LEFT<small id="leftSpeed">0.00 m/s</small></button>
+<button type="button" class="pad-center" id="cmdCenter" style="grid-area:2/2" title="Take manual control and brake">HOLD XY</button>
+<button type="button" class="direction" id="cmdRight" style="grid-area:2/3">RIGHT →<small id="rightSpeed">0.00 m/s</small></button>
+<button type="button" class="direction" id="cmdDown" style="grid-area:3/2">↓ DOWN<small id="downSpeed">0.00 m/s</small></button>
+</div>
+<div class="altitude-controls"><button type="button" id="climb">＋ Climb</button><button type="button" id="descend">− Descend</button></div><div class="command-row"><span id="verticalSource">Vertical · simulator</span><strong id="verticalCommand">HOLD · 0.00 m/s</strong></div>
+<div class="command-row"><span>World X / Y target</span><span id="worldCommand">0.00 / 0.00 m/s</span></div>
+<div class="tracker-output"><strong>Tracker output · home offset</strong><div id="trackerPixelOffset">No valid observation</div><div id="trackerGroundOffset">—</div></div>
+<small id="commandExplanation">Tracker estimates position. Simulator converts it to movement.</small>
+</div><div class="hint">Drag to orbit · Arrows: fly · W/S: climb/descend · R: return · Space: pause</div></section>
+<aside aria-label="Simulator controls">
+<div class="buttons"><button id="start" class="primary">Take off</button><button id="returnHome">Return home</button><button id="pause">Pause</button><button id="reset">Reset</button></div>
+<div class="camera-heading"><label for="visionStage">VISION</label><select id="visionStage" aria-label="Vision processing stage">
+<option value="raw">1 · Camera input</option><option value="gray">2 · Grayscale / rectified</option><option value="features">3 · ORB features</option><option value="reference">4 · Saved reference</option><option value="matches">5 · Descriptor matches</option><option value="inliers">6 · RANSAC inliers</option><option value="alignment">7 · Alignment / support</option><option value="home" selected>8 · Confirmed home</option>
+</select><button id="expandVision" title="Enlarge selected vision stage" aria-label="Enlarge selected vision stage">⤢</button></div>
+<canvas id="camera" width="640" height="480" aria-label="Processed downward camera view"></canvas>
+<div class="panel-tabs" role="tablist" aria-label="Simulator panels">
+<button id="tab-flight" role="tab" aria-selected="true" aria-controls="panel-flight" tabindex="0">Flight</button>
+<button id="tab-live" role="tab" aria-selected="false" aria-controls="panel-live" tabindex="-1">Live</button>
+<button id="tab-status" role="tab" aria-selected="false" aria-controls="panel-status" tabindex="-1">Status</button>
+<button id="tab-about" role="tab" aria-selected="false" aria-controls="panel-about" tabindex="-1">About</button>
+</div>
+<div class="panel-content">
+<section id="panel-flight" role="tabpanel" aria-labelledby="tab-flight">
+<div class="panel-note flight-note"><span>Take off, then fly manually.</span><button id="demo" class="demo-button">Auto demo</button></div>
+<fieldset id="flightSettings">
+<label>Takeoff altitude <output id="altitudeValue"></output><input id="altitude" type="range" min="2" max="12" step="0.5" value="6"></label>
+<label>Outbound distance <output id="outboundValue"></output><input id="outbound" type="range" min="2" max="100" step="1" value="20"></label>
+<label>Return heading <output id="yawValue"></output><input id="yaw" type="range" min="-180" max="180" step="15" value="90"></label>
+<label>Maximum camera tilt <output id="tiltValue"></output><input id="tilt" type="range" min="0" max="15" step="1" value="8"></label>
+</fieldset>
+</section>
+<section id="panel-live" role="tabpanel" aria-labelledby="tab-live" hidden>
+<p class="panel-note">Adjust these while the simulation is running.</p>
+<label>GPS home error <output id="gpsValue"></output><input id="gps" type="range" min="0" max="6" step="0.1" value="1.2"></label>
+<label>Wind <output id="windValue"></output><input id="wind" type="range" min="0" max="3" step="0.1" value="0.5"></label>
+<label>Simulation speed <output id="speedValue"></output><input id="speed" type="range" min="0.5" max="4" step="0.5" value="1"></label>
+<label><input id="vision" type="checkbox" checked> Enable visual guidance</label>
+<label><input id="occluded" type="checkbox"> Obscure ground / lose tracking</label>
+
+</section>
+<section id="panel-status" role="tabpanel" aria-labelledby="tab-status" hidden>
+<dl><dt>Camera height</dt><dd id="height">0 m</dd><dt>Distance to home</dt><dd id="distance">0 m</dd><dt>Vision</dt><dd id="lock">—</dd><dt>Landing error</dt><dd id="error">—</dd><dt>Roll / pitch / yaw</dt><dd id="attitude">0° / 0° / 0°</dd><dt>False / inaccurate locks</dt><dd id="badLocks">0 / 0</dd><dt>Simulated time</dt><dd id="simTime">0 s</dd></dl>
+</section>
+<section id="panel-about" role="tabpanel" aria-labelledby="tab-about" hidden>
+<small>Actual ORB matching and calibrated home offsets guide the quad. The default ground is a seeded 256 × 256 m gravel/soil world, generated nearby on demand without repeating chunks. Optional photographs cover a 10 m wide plane. Terrain is flat. Motion is simplified. Camera yaw, roll, and pitch affect the rendered image, with ideal synchronized telemetry. Heading turns at up to 40°/s; tilt follows horizontal velocity. Touchdown is modeled at 0.5 m camera height. Visual loss holds descent and resumes GPS horizontal guidance. Time advances with processed frames, so speed depends on your computer. No Betaflight or hardware connection.</small>
+
+</section>
+</div>
+<div class="panel-footer"><div id="message" role="status"></div><p id="tracking"></p></div>
+</aside></main>
+<dialog id="visionDialog" aria-labelledby="visionDialogTitle">
+<div class="vision-dialog-toolbar"><strong id="visionDialogTitle">Vision stages</strong><select id="visionStageLarge" aria-label="Enlarged vision processing stage"></select><button id="visionPause">Pause</button><button id="closeVision" aria-label="Close enlarged vision view">Close</button></div>
+<canvas id="visionLarge" width="640" height="480" aria-label="Enlarged vision processing view"></canvas>
+<p id="visionCaption">Actual tracker diagnostics. Overlays are added after processing.</p>
+</dialog>
+<script src="sim.js"></script>
+</body></html>

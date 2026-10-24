@@ -82,6 +82,16 @@ def webcam(args):
 def main():
     parser = argparse.ArgumentParser(description='Natural-ground landing research baseline')
     commands = parser.add_subparsers(dest='command',required=True)
+    sim = commands.add_parser('simulate', help='Open the offline illustrative 3D landing simulator')
+    sim.add_argument('--port', type=int, default=8765)
+    sim.add_argument('--no-browser', action='store_true')
+    sim.add_argument('--image', help='Use a photograph instead of procedural ground (flat 10 m wide plane)')
+    sim.add_argument('--ground-size', type=float, default=256., help='Procedural ground width in meters (32–4096; default: 256)')
+    sim.add_argument('--seed', type=int, default=7, help='Procedural ground seed (default: 7)')
+    trials = commands.add_parser('sim-trials', help='Run repeatable closed-loop flights without a browser')
+    trials.add_argument('--seeds', default='7,42', help='Comma-separated terrain seeds')
+    trials.add_argument('--max-time', type=float, default=120., help='Per-flight simulated timeout in seconds')
+    trials.add_argument('--output', default='results/simulation_trials.json')
     live = commands.add_parser('webcam')
     live.add_argument('--device',type=int,default=0)
     live.add_argument('--camera',help='Camera calibration JSON')
@@ -97,7 +107,15 @@ def main():
     benchmark.add_argument('--check',action='store_true',help='Fail if the controlled-scene regression bounds are exceeded')
     args = parser.parse_args()
     try:
-        if args.command == 'webcam':
+        if args.command == 'simulate':
+            from .simulator import serve
+            serve(args.port, open_browser=not args.no_browser, image=args.image, seed=args.seed, ground_size=args.ground_size)
+        elif args.command == 'sim-trials':
+            from .simulation_trials import run_trials
+            seeds = [int(value.strip()) for value in args.seeds.split(',')]
+            report = run_trials(seeds, args.output, max_time=args.max_time)
+            print(json.dumps(dict(summary=report['summary'], output=args.output), indent=2))
+        elif args.command == 'webcam':
             webcam(args)
         elif args.command == 'replay':
             report = run_replay(args.manifest,args.output)

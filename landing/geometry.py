@@ -102,3 +102,13 @@ def plane_homography(camera, reference_position, reference_rotation, live_positi
         return camera.matrix @ np.column_stack((Rt[:, 0], Rt[:, 1], t))
     return plane_matrix(live_position, live_rotation) @ np.linalg.inv(
         plane_matrix(reference_position, reference_rotation))
+
+
+def camera_to_ground_homography(camera, position, camera_to_world):
+    """Image pixels -> world x/y on z=0, for synthetic camera rendering."""
+    Rt = checked_rotation(camera_to_world).T
+    position = np.asarray(position, dtype=float)
+    if position.shape != (3,) or not np.isfinite(position).all() or position[2] <= 0:
+        raise ValueError('Camera position must be finite and above ground')
+    plane = camera.matrix @ np.column_stack((Rt[:, 0], Rt[:, 1], -Rt @ position))
+    return np.linalg.inv(plane)

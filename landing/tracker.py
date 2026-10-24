@@ -71,7 +71,10 @@ class Observation:
 
 
 class LandingTracker:
-    def __init__(self, config=None, camera=None):
+    def __init__(self, config=None, camera=None, *, debug=False):
+        self.debug_enabled = debug
+        self.debug_frame = {}
+        self.debug_reference_images = []
         self.config = config or TrackerConfig()
         c = self.config
         self.extractor = Extractor(c.max_features, c.max_width, c.max_height, camera)
@@ -82,9 +85,21 @@ class LandingTracker:
         self._confirmations = 0
 
     def reset(self):
+        self.debug_frame = {}
+        self.debug_reference_images.clear()
         self.references.clear()
         self._previous_home = self._previous_timestamp = self._active_reference = None
         self._confirmations = 0
+
+    def _debug_begin(self, mode, timestamp):
+        if self.debug_enabled:
+            self.debug_frame = dict(mode=mode, timestamp_s=float(timestamp), gray=None,
+                                    points=None, alignments=[], selected_reference=None)
+
+    def _debug_features(self, gray, features):
+        if self.debug_enabled:
+            self.debug_frame['gray'] = gray.copy()
+            self.debug_frame['points'] = features.points.copy()
 
     @property
     def reference_bytes(self):
@@ -93,52 +108,69 @@ class LandingTracker:
 
     def _align(self, reference, live):
         c = self.config
+        trace = None
+        if self.debug_enabled:
+            trace = dict(reference_index=next((i for i, item in enumerate(self.references) if item is reference), None),
+                         source=None, target=None, inliers=None, homography=None, accepted=False, reason='not_matched')
+            self.debug_frame.setdefault('alignments', []).append(trace)
+        def reject(reason):
+            if trace is not None:
+                trace['reason'] = reason
+            return None
         if reference.features.shape != live.shape:
-            return None
+            return reject('shape_mismatch')
         matches = mutual_ratio_matches(reference.features, live, c.ratio)
+        if trace is not None:
+            trace['source'] = np.float32([reference.features.points[m.queryIdx] for m in matches]).reshape(-1, 2)
+            trace['target'] = np.float32([live.points[m.trainIdx] for m in matches]).reshape(-1, 2)
         if len(matches) < c.min_inliers:
-            return None
+            return reject('too_few_matches')
         source = np.float32([reference.features.points[m.queryIdx] for m in matches])
         target = np.float32([live.points[m.trainIdx] for m in matches])
         H, mask = cv2.findHomography(source, target, cv2.RANSAC, c.reprojection_px,
                                      maxIters=2000, confidence=0.995)
         if H is None or mask is None or not np.isfinite(H).all():
-            return None
+            return reject('homography_failed')
         keep = mask.ravel().astype(bool)
+        if trace is not None:
+            trace['inliers'] = keep.copy()
+            trace['homography'] = H.copy()
         count, ratio = int(keep.sum()), float(keep.mean())
         if count < c.min_inliers or ratio < c.min_inlier_ratio:
-            return None
+            return reject('too_few_inliers')
         source, target = source[keep], target[keep]
         h, w = live.shape
         norm = np.diag([1/w, 1/h, 1])
         if np.linalg.cond(norm @ H @ np.linalg.inv(norm)) > 1e5:
-            return None
+            return reject('degenerate_transform')
         try:
             home = project_point(H, reference.home)
             scale, anisotropy = local_scale(H, reference.home)
             inverse = np.linalg.inv(H)
         except (ValueError, np.linalg.LinAlgError):
-            return None
+            return reject('invalid_projection')
         if anisotropy > c.max_anisotropy or not (0 <= home[0] < w and 0 <= home[1] < h):
-            return None
+            return reject('home_outside_view_or_anisotropic')
         hull_source, hull_target = cv2.convexHull(source), cv2.convexHull(target)
         coverage = min(cv2.contourArea(hull_source), cv2.contourArea(hull_target))/(w*h)
         if coverage < c.min_coverage:
-            return None
+            return reject('insufficient_coverage')
         # Avoid extrapolating home beyond the supporting ground correspondences.
         if cv2.pointPolygonTest(hull_source, tuple(map(float, reference.home)), False) < 0:
-            return None
+            return reject('home_outside_reference_support')
         if cv2.pointPolygonTest(hull_target, tuple(map(float, home)), False) < 0:
-            return None
+            return reject('home_outside_live_support')
         forward = cv2.perspectiveTransform(source[:, None, :], H)[:, 0, :]
         backward = cv2.perspectiveTransform(target[:, None, :], inverse)[:, 0, :]
         errors = np.maximum(np.linalg.norm(forward-target, axis=1), np.linalg.norm(backward-source, axis=1))
         median = float(np.median(errors))
         if median > c.max_median_error_px or not np.isfinite(errors).all():
-            return None
+            return reject('reprojection_error')
         quality = dict(matches=len(matches), inliers=count, inlier_ratio=ratio,
                        coverage=coverage, median_error_px=median,
                        scale_reference_to_live=scale, anisotropy=anisotropy)
+        if trace is not None:
+            trace.update(accepted=True, reason='geometry_accepted')
         return home, quality
 
     def _best(self, features):
@@ -158,7 +190,10 @@ class LandingTracker:
             return None
         # Keep a good current reference rather than flicker between nearby levels.
         active = next((item for item in candidates if item[1] == self._active_reference), None)
-        return active if active is not None and active[0] >= best[0]*0.85 else best
+        chosen = active if active is not None and active[0] >= best[0]*0.85 else best
+        if self.debug_enabled:
+            self.debug_frame['selected_reference'] = chosen[1]
+        return chosen
 
     def map_frame(self, image, timestamp_s, home=None, force=False, *,
                   camera_to_world=None, telemetry_timestamp_s=None):
@@ -170,8 +205,10 @@ class LandingTracker:
         """
         if not np.isfinite(timestamp_s):
             raise ValueError("Frame timestamp must be finite")
+        self._debug_begin('map', timestamp_s)
         gray, camera = self.extractor.prepare(image)
         features = self.extractor.extract(gray)
+        self._debug_features(gray, features)
         if len(features.points) < self.config.min_inliers:
             return "insufficient_features"
         if self.references and timestamp_s <= self.references[-1].timestamp_s:
@@ -198,6 +235,8 @@ class LandingTracker:
             if alignment is None:
                 return "mapping_lost"
             anchor, quality = alignment
+            if self.debug_enabled:
+                self.debug_frame['selected_reference'] = len(self.references)-1
             scale = quality['scale_reference_to_live']
             if not force:
                 if timestamp_s-self.references[-1].timestamp_s < self.config.keyframe_interval_s:
@@ -205,11 +244,14 @@ class LandingTracker:
                 if self.config.keyframe_scale < scale < 1/self.config.keyframe_scale:
                     return "mapping"
         self.references.append(Reference(features, anchor.copy(), float(timestamp_s)))
+        if self.debug_enabled:
+            self.debug_reference_images.append(gray.copy())
         return "captured"
 
     def observe(self, image, timestamp_s, *, height_m=None, camera_to_world=None,
                 telemetry_timestamp_s=None, now_s=None):
         started = time.perf_counter()
+        self._debug_begin('observe', timestamp_s)
         if not np.isfinite(timestamp_s) or (now_s is not None and not np.isfinite(now_s)):
             raise ValueError("Timestamps must be finite")
         result = Observation(float(timestamp_s))
@@ -236,7 +278,9 @@ class LandingTracker:
         self._previous_timestamp, previous_timestamp = float(timestamp_s), self._previous_timestamp
         if not self.references:
             return finish("no_reference")
-        best = self._best(self.extractor.extract(gray))
+        features = self.extractor.extract(gray)
+        self._debug_features(gray, features)
+        best = self._best(features)
         if best is None:
             return finish("no_good_alignment")
         _, index, home, quality = best
