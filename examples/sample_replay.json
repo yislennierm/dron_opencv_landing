@@ -1,0 +1,9 @@
+{
+  "frames": [
+    {"image": "../sample.jpg", "timestamp_s": 0.0, "mode": "map"},
+    {"image": "../sample.jpg", "timestamp_s": 0.1, "expected_visible": true, "ground_truth_home_px": [320, 180]},
+    {"image": "../sample.jpg", "timestamp_s": 0.2, "expected_visible": true, "ground_truth_home_px": [320, 180]},
+    {"image": "../sample.jpg", "timestamp_s": 0.3, "expected_visible": true, "ground_truth_home_px": [320, 180]},
+    {"image": "../sample.jpg", "timestamp_s": 0.4, "expected_visible": true, "ground_truth_home_px": [320, 180]}
+  ]
+}

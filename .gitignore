@@ -8,6 +8,8 @@ __pycache__/
 # Generated visualizations
 output_matches.png
 fast_orb_profiler_output.png
+results/
+observations.jsonl
 
 # Local configuration and editor files
 .env

@@ -1,16 +1,22 @@
 # Drone OpenCV Landing
 
-Experimental Python/OpenCV demos for visual return-to-home (RTH) and landing
-guidance. The camera records reference views of the ground, then matches a live
-view against them to locate a stored home point.
+Python/OpenCV proof of concept for landing over a remembered natural takeoff
+area, with no printed marker. The eventual target is an ESP32-P4-based flight
+controller; the current milestone validates the vision and geometry in Python.
 
-The pipeline uses FAST corner detection, ORB descriptors, Hamming-distance
-matching, and RANSAC homography estimation. The webcam demos display the home
-point and its offset from the image center. Optional altitude values and camera
-field of view provide an approximate conversion from pixels to meters.
+The `landing` package is the maintained baseline. It uses oriented, multiscale
+ORB features, mutual descriptor matching, and reference-to-live homographies.
+It includes bounded reference storage, alignment quality checks, temporal lock
+confirmation, calibrated ground projection, and replay with ground-truth metrics.
 
-This is a webcam research prototype. Flight-controller integration is not
-implemented. Reference views are kept in memory and are lost when a demo exits.
+The output is a timestamped observation with separate image-tracking and metric
+validity. Metric output requires calibration, current camera height above the
+ground, and synchronized camera attitude. Reference views live in memory; replay
+manifests reproduce them. Motor control and flight-controller integration remain
+future work.
+
+See [geometry and validation](docs/landing_baseline.md) and the
+[commercial drone comparison](docs/commercial_drones.md).
 
 ## Setup
 
@@ -32,7 +38,51 @@ On Windows, use `py -m venv .venv` and activate with
 must be configured on each computer. HTTPS cloning is also available:
 `https://github.com/yislennierm/dron_opencv_landing.git`.
 
-## Scripts
+## Run the maintained baseline
+
+```sh
+python -m landing webcam --device 0
+```
+
+Keep the camera pointed at textured, approximately flat ground. Start with a
+level camera over the intended home point:
+
+- **Space** starts or pauses mapping, setting the first home at the processed
+  image center. New references are captured after validated scale changes.
+- **F** forces a reference capture when alignment is good.
+- **L** switches to locating home against the saved references.
+- **R** resets; **Q / Escape** exits.
+
+The overlay draws home only after three consistent observations. With no
+calibration and telemetry, output is in processed pixels. For a controlled,
+stationary bench setup, supply your own calibrated camera JSON and explicitly
+assume a level camera and fixed current height:
+
+```sh
+python -m landing webcam --camera my_camera.json --assume-level --height 2.0 --log observations.jsonl
+```
+
+`examples/camera.example.json` documents the format; its numbers are illustrative,
+not a calibration. An actual moving-camera experiment should supply per-frame
+attitude and height through replay or the Python API. Height is measured from the
+camera to the ground plane, not barometric altitude above takeoff.
+
+Run repeatable checks without a camera or GUI:
+
+```sh
+python -m unittest discover -s tests -v
+python -m landing benchmark --check --output results/synthetic.json
+python -m landing benchmark --check --image sample.jpg --output results/sample.json
+python -m landing replay examples/sample_replay.json --output results/replay.json
+```
+
+The sample replay reuses a single image to check the replay interface; it is not
+an ascent/descent recording.
+Benchmarks render known planar transformations and report error, rejected frames,
+false locks, recovery frames, and processing latency. Synthetic accuracy does not
+establish real landing accuracy or ESP32-P4 throughput.
+
+## Original experimental scripts
 
 | Script | Purpose |
 | --- | --- |
@@ -44,13 +94,13 @@ must be configured on each computer. HTTPS cloning is also available:
 | `webcam_rth_auto_levels.py` | Attempts automatic reference capture during takeoff and reference selection during landing. |
 | `webcam_rth_auto_levels1.py` | Variant with modified scale estimation and capture thresholds. |
 
-The numbered files are experimental variants, not a tested release sequence.
-Image alignment and home-point propagation still need validation before relying
-on their output.
+These files preserve the original experiments, including known direction, scale,
+and descriptor-orientation problems. Use `python -m landing` for the corrected
+baseline. The numbered files are not a tested release sequence.
 
-## Run
+## Running the original experiments
 
-Start with the manual webcam demo:
+The original manual webcam demo:
 
 ```sh
 python webcam_rth_demo3.py --device 0 --resolution 640x480
